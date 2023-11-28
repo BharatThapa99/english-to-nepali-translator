@@ -14,16 +14,20 @@ import requests
 import json
 import time
 import os
-from requests.auth import HTTPProxyAuth
+import random
 
-from proxy_utils import scrape_proxies
+from requests.auth import HTTPProxyAuth
+from fake_useragent import UserAgent
+
+
+# from proxy_utils import scrape_proxies
 
 
 
 api_endpoint = "http://translate.googleapis.com/translate_a/single"
 
 count = 0
-input_file = 'Datasets/english_dataset_5000_1.json'
+input_file = 'Datasets/english_dataset_1000.json'
 
 base_name, extension = os.path.splitext(os.path.basename(input_file))
 output_file = os.path.join(os.path.dirname(input_file), f'{base_name}_trans_nepali{extension}')
@@ -64,16 +68,27 @@ def translate(text, target_lang, source_lang,proxy=None):
          'https':proxy,
     }
     proxy_auth = HTTPProxyAuth(proxy_username, proxy_password)
+    #generate random useragent
+    ua = UserAgent()
+    random_ua = ua.random
+
+    
 
     try:
         #try with original ip until it gets blocked. Then use proxies.
 
         if proxy:
-            response = requests.get(api_endpoint,params=params, proxies=proxies,timeout=4,auth=proxy_auth)
+            headers = {
+                'User-Agent': str(random_ua)
+            }
+            response = requests.get(api_endpoint,params=params, proxies=proxies,headers=headers, timeout=4,auth=proxy_auth)
             print(f"Using proxy: {proxy},\n {response}")
         else:
+            headers = {
+                'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+            }
             # print(f"No proxy is used for this request.")
-            response = requests.get(api_endpoint,params=params, timeout=10)
+            response = requests.get(api_endpoint,params=params, headers=headers, timeout=10)
         
         response.raise_for_status()
         if response.status_code == 200:
@@ -108,47 +123,48 @@ def set_proxy():
     global proxy_index
     global proxy_list_error_count
     # print(f"proxy list error count - {proxy_list_error_count}")
-    for i in range(proxy_index, len(proxies)+2):
-        proxy_index = i+1
-        # print(f"proxy index = {proxy_index} and length of proxies = {len(proxies)}")
-        if proxy_index == len(proxies):
-            print("All proxies checked. Reusing from start...\n") #TODO: fetch new list of proxy
-            proxy_list_error_count += 1
-            if proxy_list_error_count > 1:
-                # scrape_proxies() #update the proxies list
-                # read_proxy_list() #read updated proxies list
-                proxy_list_error_count = 0
-            proxy_index = 0
-            working_proxy = ""
-            break
-        # print(proxies[i])
-        # exit()
-        proxy = {
-                'http':proxies[i],
-                'https':proxies[i],
-        }
-        proxy_auth = HTTPProxyAuth(proxy_username, proxy_password)
-        try:
-            # test = requests.get("http://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl=en&tl=ne&q=",proxies=proxy,timeout=2, auth=proxy_auth)
-            # if test.status_code == 200:
-                # print(test.text)
-            working_proxy = str(proxies[i]).strip()
-            print(f"{working_proxy} selected. ")
-            return working_proxy
-                
-                
-                # break
-            # else:
-                # print(f"{proxies[i]} failed to connect")
-        # except requests.exceptions.Timeout as e:
-        #     print(f"Timeout error: {proxies[i]}")    
-        # except requests.exceptions.ProxyError as e:
-        #     print(f"Proxy connection error: {proxies[i]}")
-        # except requests.exceptions.RequestException as e:
-        #     print(f"Request error: {proxies[i]}")
+    random_proxy = random.choice(proxies)
+    # for i in range(proxy_index, len(proxies)+2):
+    # proxy_index = i+1
+    # print(f"proxy index = {proxy_index} and length of proxies = {len(proxies)}")
+    # if proxy_index == len(proxies):
+        # print("All proxies checked. Reusing from start...\n") #TODO: fetch new list of proxy
+        # proxy_list_error_count += 1
+        # if proxy_list_error_count > 1:
+            # scrape_proxies() #update the proxies list
+            # read_proxy_list() #read updated proxies list
+            # proxy_list_error_count = 0
+        # proxy_index = 0
+        # working_proxy = ""
+        # break
+    # print(proxies[i])
+    # exit()
+    proxy = {
+            'http':random_proxy,
+            'https':random_proxy,
+    }
+    proxy_auth = HTTPProxyAuth(proxy_username, proxy_password)
+    try:
+        # test = requests.get("http://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl=en&tl=ne&q=",proxies=proxy,timeout=2, auth=proxy_auth)
+        # if test.status_code == 200:
+            # print(test.text)
+        working_proxy = str(random_proxy.strip())
+        print(f"{working_proxy} selected. ")
+        return working_proxy
+            
+            
+            # break
+        # else:
+            # print(f"{proxies[i]} failed to connect")
+    # except requests.exceptions.Timeout as e:
+    #     print(f"Timeout error: {proxies[i]}")    
+    # except requests.exceptions.ProxyError as e:
+    #     print(f"Proxy connection error: {proxies[i]}")
+    # except requests.exceptions.RequestException as e:
+    #     print(f"Request error: {proxies[i]}")
 
-        except Exception as e:
-            print(f"An unexpected error occurred: {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
 
 def save_result(trans_query, trans_response):
     current_chunk = []
@@ -198,12 +214,12 @@ try:
             response = json_object['response']
 
             #if no proxy is set then use no proxy
-            if working_proxy != "":
-                trans_query_without_proxy =  translate(query, 'ne', 'auto')
+            if working_proxy == "":
+                trans_query_without_proxy =  translate(query, 'ne', 'en')
 
                 if trans_query_without_proxy:
-                    time.sleep(2)
-                    trans_response_without_proxy = translate(response,'ne','auto') #translate response
+                    time.sleep(random.uniform(1, 3))
+                    trans_response_without_proxy = translate(response,'ne','en') #translate response
                     if trans_response_without_proxy:
                         time.sleep(2)
 
